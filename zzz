@@ -4,7 +4,8 @@ fail() {
     MESSAGE=$1
     RED='\033[0;31m'
     NC='\033[0m'
-    echo -e "$RED Failure: $MESSAGE $NC"
+    echo -e "${RED}Failure: $MESSAGE $NC"
+    echo ""
     exit 1;
 }
 
@@ -16,94 +17,129 @@ continue() {
     fi
 }
 
-branch_kafka() {
-    BRANCH=$1
-    C=$2
+branch() {
+    BRANCH="$1"
+    SETS="$2"
+    C="${@:3}"
 
-    MESSAGE="$BRANCH/checkout"
-    echo $MESSAGE
+    echo ""
+#    echo "branch=$BRANCH"
+#    echo "modules=$SETS"
+#    echo "commands=$C"
+
     git checkout $BRANCH
-    continue $? $MESSAGE
+    continue $? "$BRANCH/checkout"
 
-    MESSAGE="$BRANCH/merge $MASTER"
-    echo $MESSAGE
-    git merge $MASTER
-    continue $? $MESSAGE
-
-    if [ $ALL == "true" ]; then
-        MESSAGE="$BRANCH/$C (all modules)"
+    if [ "$BRANCH" != "master" ]; then
+        MESSAGE="$BRANCH/merge master"
         echo $MESSAGE
-        ./gradlew $C
-        continue $? $MESSAGE
-    else
-        MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
-        echo $MESSAGE
-        ./gradlew :kafka:avro-formatter-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:avro-serde-kafka:$C"
-        echo $MESSAGE
-        ./gradlew :kafka:avro-serde-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:storage-kafka:$C"
-        ./gradlew :kafka:storage-kafka:$C
-        continue $? $MESSAGE
-        MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
-        ./gradlew :kafka:test-util-kafka:$C
+        git merge master --no-edit
         continue $? $MESSAGE
     fi
-    continue $? "$BRANCH: $C"
+
+    if [ "$C" != "-" ]; then
+        if [ "$SETS" == "-" ]; then
+            MESSAGE="$BRANCH/$C (all modules)"
+            echo $MESSAGE
+            ./gradlew $C
+            continue $? $MESSAGE
+        elif [ $SETS == "kafka" ]; then
+            MESSAGE="$BRANCH/:kafka:avro-formatter-kafka:$C"
+            echo $MESSAGE
+            ./gradlew :kafka:avro-formatter-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:avro-serde-kafka:$C"
+            echo $MESSAGE
+            ./gradlew :kafka:avro-serde-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:storage-kafka:$C"
+            ./gradlew :kafka:storage-kafka:$C
+            continue $? $MESSAGE
+            MESSAGE="$BRANCH/:kafka:test-util-kafka:$C"
+            ./gradlew :kafka:test-util-kafka:$C
+            continue $? $MESSAGE
+        else
+            fail "Unknown set of modules: $SETS"
+        fi
+    fi
 
 }
 
 Usage() {
     echo ""
-    echo "Usage: ./zzz (test|build|install|publish)"
+    echo "This script will run the given gradle commands over the whole cross-compiled space of this project."
     echo ""
-    echo "  This script will run the given gradle commands over the whole cross-compiled space of this project."
+    echo "Usage: ./zzz <TASK> [<MODULE-SET>]"
     echo ""
-    echo "Example: ./zzz test"
-    echo "  The above will run tests on the following branches, while attempting to merge master into each"
-    echo "      master"
-    echo "      master-kafka_0.10"
+    echo "  MODULE-SET:"
+    echo "      -                   - if omitted runs for all modules"
+    echo "      kafka               - run for all kafka submodules"
+    echo "      spark               - run for all spark submodules"
     echo ""
-    fail "Missing at least one gradle command argument"
+    echo "  TASK: "
+    echo "      test                - run test on branches only"
+    echo "      test-all            - run all tests on master and all branches"
+    echo "      merge               - only merge master into all branches"
+    echo "      install             - install selected modules sets from all branches into local maven"
+    echo "      publish-master      - publish selected modules sets to maven-central"
+    echo "      publish-branches    - publish selected modules sets maven-central"
+    echo ""
+    echo ""
 }
 
-
 case "$1" in
+    test-all)
+        C="test --quiet"
+        RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
+        ;;
     test)
         C="test --quiet"
-        ALL="true"
+        RUN_ON_MASTER="false"
+        RUN_ON_BRANCHES="true"
         ;;
-    build)
-        C="build --quiet --exclude-task test --quiet"
-        ALL="false"
+    merge)
+        C="-"
+        RUN_ON_MASTER="false"
+        RUN_ON_BRANCHES="true"
         ;;
     install)
         C="install"
-        ALL="false"
+        RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
         ;;
-    publish)
+    publish-master)
+        C="uploadArchives -Pmaven-central --quiet"
+        RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="false"
+        ;;
+    publish-kafka-branches)
         C="uploadArchives -Pmaven-central --quiet"
         ALL="false"
+        RUN_ON_MASTER="true"
+        RUN_ON_BRANCHES="true"
         ;;
     *)
         Usage
+        fail "Invalid <TASK> argument"
         ;;
 esac
 
-MASTER="master"
-git checkout $MASTER
-continue $? "$MASTER/checkout"
+if [ -z "$2" ]; then
+    SETS="-"
+else
+    SETS="$2"
+fi
 
 #excute on master branch / all modules
-MESSAGE="$MASTER/$C (all modules)"
-echo $MESSAGE
-./gradlew $C
-continue $? $MESSAGE
+if [ "$RUN_ON_MASTER" == "true" ]; then
+    branch "master" "$SETS" "$C"
+fi
 
-branch_kafka "master-kafka_0.10" $C
-branch_kafka "master-kafka_0.11" $C
+if [ "$RUN_ON_BRANCHES" == "true" ]; then
+    branch "master-kafka_0.10" "$SETS" $C
+    branch "master-kafka_0.11" "$SETS" $C
+fi
 
-git checkout $MASTER
+git checkout "master"
 continue $? "Checkout back to root branch"
