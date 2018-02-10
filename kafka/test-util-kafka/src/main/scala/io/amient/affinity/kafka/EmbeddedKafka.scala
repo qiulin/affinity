@@ -62,4 +62,5 @@ trait EmbeddedKafka extends EmbeddedZooKeeper with BeforeAndAfterAll {
     }
     super.afterAll()
   }
+
 }
