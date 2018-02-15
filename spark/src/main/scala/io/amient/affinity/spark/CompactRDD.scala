@@ -17,11 +17,10 @@
  * limitations under the License.
  */
 
-package io.amient.util.spark
+package io.amient.affinity.spark
 
 import io.amient.affinity.core.serde.AbstractSerde
 import io.amient.affinity.core.util.{EventTime, TimeRange}
-import io.amient.affinity.spark.BinaryCompactRDD
 import io.amient.affinity.stream._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.util.LongAccumulator
@@ -31,6 +30,13 @@ import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 
 object CompactRDD {
+
+  def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
+                                      streamBinder: => BinaryStream,
+                                      range: TimeRange,
+                                      compacted: Boolean)(implicit sc: SparkContext): RDD[(K, V)] = {
+    apply[K,V](serdeBinder, serdeBinder, streamBinder, range, compacted)
+  }
 
   def apply[K: ClassTag, V: ClassTag](serdeBinder: => AbstractSerde[Any],
                                       streamBinder: => BinaryStream,
