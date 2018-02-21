@@ -171,12 +171,23 @@ horizontally by the means of partitioning - read-replicas would break the possib
 
 ## State Management
 
+![State_Management](doc/Affinity_State_Management.jpg)
+
+
 All data is stored 1) in the persistent storage in the form
-of change log, e.g. Kafka compacted topic and 2) in a memstore implementation
-which like SimpleMap or RocksDb. Each physical partition has one exclusive owner
-- master - for both reads and writes which is then tailed by all standby replicas.
-So a single Storage Partition can have multiple active Affinity Partitions, one of which is
-always a master and the remainder are standby(s).
+of change log, e.g. Kafka compacted topic and 2) in a memstore implementation, e.g. RocksDb.
+Each physical partition has one exclusive owner - master - for both reads and writes which
+is then tailed by all standby replicas. A single Storage Partition can have multiple active
+Affinity Partitions, one of which is always a master and the remainder are standby(s).
+
+Each Affinity Partition, whether master or standby, maintains a checkpoint for a
+concrete storage layer which says how far is the memstore up to date with the storage log.
+Upon startup or when a partition becomes a master, the memstore is bootstrapped
+from the last recorded checkpoint up to the end of the log available in the storage layer.
+The checkpoints are periodically stored on a local disk giving the system at-least-once
+guarantee in terms of durability - in terms of end-to-end processing it is also
+possible to maintain at-least-once guarantee by using the futures returned by write
+operations.
 
 As mentioned elsewhere, Keyspace (Actor) manages a set of Partitions (also Actors)
 and each Partition can hold multilple state stores whose partitioning scheme will
@@ -219,14 +230,17 @@ in case of completely new assignment or checkpoint corruption.
 
 ### Notes on consistency
 
-In cases where eventual read consistency is sufficient, standby(s)
-can also be used as read replicas (this is currently not implemented
-but the design is expecting this to come in future).
-
 The State described above applies to Keyspaces - these are represented
 by a Keyspace actor that routes all messages to all of its Partition
 actors. Since actors are single-threaded and there is only one master
 actor per partition the integrity of reads and writes is guaranteed.
+
+Since master takes all reads and writes, the system is always
+fully consistent but relies solely on partitioning for scaling out.
+The replicas server only as hot standbys providing high availability.
+
+In cases where eventual read consistency is sufficient, standby(s)
+could also be used as read replicas but this is currently not implemented.
 
 Sometimes it is necessary to use global state rather than partitioned
 Keyspace. In this case all gateways that hold reference to a global
