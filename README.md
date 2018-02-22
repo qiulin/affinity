@@ -1,4 +1,4 @@
-# Build Status ![CircleCI](https://circleci.com/gh/amient/affinity/tree/master-spark_2.0.png?circle-token=:circle-token)
+### Build Status ![CircleCI](https://circleci.com/gh/amient/affinity/tree/master-spark_2.0.png?circle-token=:circle-token)
 
 # Design Goals
 
