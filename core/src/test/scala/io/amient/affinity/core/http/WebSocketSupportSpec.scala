@@ -99,13 +99,12 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
                   case keyValueMediator =>
                     log.info(s"subscribing to $keyValueMediator")
                     this.mediator = keyValueMediator
-                    keyValueMediator ! RegisterMediatorSubscriber(upstream)
                     upstream ! TextMessage.Strict("Welcome")
                     upstream ! TextMessage.Strict("Here is your token")
+                    keyValueMediator ! RegisterMediatorSubscriber(upstream)
                 }
               case msg if mediator == null => log.warning(s"IGNORING DOWNSTREAM - MEDIATOR NOT CONNECTED: $msg")
-              case TextMessage.Strict("Write") if mediator != null =>
-                mediator ! ID(3)
+              case TextMessage.Strict("Write") if mediator != null => mediator ! ID(3)
 
             }
 
@@ -211,8 +210,7 @@ class WebSocketSupportSpec extends IntegrationTestBase with Matchers {
   }
 
   "Custom WebSocket channel" must {
-    //FIXME #153
-    "work" ignore {
+    "work" in {
       val wsqueue = new LinkedBlockingQueue[String]()
       val ws = new WebSocketClient(URI.create(s"ws://127.0.0.1:$httpPort/test-custom-socket"), new TextMessageHandler() {
         override def onError(e: Throwable): Unit = e.printStackTrace()
