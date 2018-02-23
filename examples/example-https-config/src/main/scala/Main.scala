@@ -17,14 +17,20 @@
  * limitations under the License.
  */
 
+import com.typesafe.config.ConfigFactory
+import io.amient.affinity.core.cluster.Node
 
-package io.amient.affinity.example.minimal
+import scala.util.control.NonFatal
 
-import io.amient.affinity.avro.record.AvroRecord
-import io.amient.affinity.core.actor.Routed
-import io.amient.affinity.core.util.Reply
+object Main extends App {
 
-case class GetValue(key: String) extends AvroRecord with Routed with Reply[Option[String]]
+  try {
 
-case class PutValue(key: String, value: String) extends AvroRecord with Routed with Reply[Option[String]]
+    new Node(ConfigFactory.load("https-example")).start()
 
+  } catch {
+    case NonFatal(e) =>
+      e.printStackTrace()
+      System.exit(1)
+  }
+}

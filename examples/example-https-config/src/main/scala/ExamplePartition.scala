@@ -17,22 +17,29 @@
  * limitations under the License.
  */
 
-package io.amient.affinity.example.minimal
+import io.amient.affinity.avro.record.AvroRecord
+import io.amient.affinity.core.ack
+import io.amient.affinity.core.actor.{Partition, Routed}
+import io.amient.affinity.core.util.Reply
 
-import com.typesafe.config.ConfigFactory
-import io.amient.affinity.core.cluster.Node
+case class GetValue(key: String) extends AvroRecord with Routed with Reply[Option[String]]
 
-import scala.util.control.NonFatal
+case class PutValue(key: String, value: String) extends AvroRecord with Routed with Reply[Option[String]]
 
-object Main extends App {
+class ExamplePartition extends Partition {
 
-  try {
+  val cache = state[String, String]("cache")
 
-    new Node(ConfigFactory.load("minimal-example")).start()
+  import context.dispatcher
 
-  } catch {
-    case NonFatal(e) =>
-      e.printStackTrace()
-      System.exit(1)
+  override def handle: Receive = {
+    case request @ GetValue(key: String) => sender.reply(request) {
+      cache(key)
+    }
+
+    case request @ PutValue(key: String, value: String) => sender.replyWith(request) {
+      cache.update(key, value)
+    }
   }
+
 }
