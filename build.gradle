@@ -187,13 +187,13 @@ allprojects {
     tasks.withType(ScalaCompile) {
         scalaCompileOptions.additionalParameters = [
 //                                                   "-feature",
-//                                                    "-target:jvm-" + javaVersion,
-//                                                    "-encoding", rootProject.encoding,
-//                                                    "-unchecked",
-//                                                    "-deprecation",
-//                                                    "-Xfuture",
-//                                                    "-Yno-adapted-args",
-//                                                    "-Ywarn-dead-code",
+                                                    "-target:jvm-" + javaVersion,
+                                                    "-encoding", rootProject.encoding,
+                                                    "-unchecked",
+                                                    "-deprecation",
+                                                    "-Xfuture",
+                                                    "-Yno-adapted-args",
+                                                    "-Ywarn-dead-code",
                                                     "-Ywarn-numeric-widen",
                                                     "-Ywarn-unused"
                                                     ]
