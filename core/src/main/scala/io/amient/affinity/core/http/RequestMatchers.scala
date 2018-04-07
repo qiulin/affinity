@@ -56,6 +56,20 @@ object RequestMatchers {
     }
   }
 
+  object CLIENTIP {
+    def unapply(request: HttpRequest): Option[RemoteAddress.IP] = {
+      for (
+        remoteAddress <- request.header[headers.`X-Forwarded-For`].flatMap(_.addresses.headOption)
+          .orElse(request.header[headers.`Remote-Address`].map(_.address))
+          .orElse(request.header[headers.`X-Real-Ip`].map(_.address));
+        if (!remoteAddress.isUnknown);
+        ip <- remoteAddress.toIP
+      ) yield {
+        ip
+      }
+    }
+  }
+
   private def HTTP_(method: HttpMethod, exchange: HttpExchange): Option[(ContentType, RequestEntity, Path, Query, Promise[HttpResponse])] = try {
     exchange.request.method match {
       case `method` =>
