@@ -91,10 +91,13 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     private void fsmEnterWriteState() {
         switch(fsm) {
             case INIT: throw new IllegalStateException("Bootstrap is required before writing");
-            case TAIL: stopLogSync(); break;
-            case BOOT: case WRITE: break;
+            case TAIL: synchronized(this) {
+                if (fsm == FSM.TAIL) stopLogSync();
+                this.fsm = FSM.WRITE;
+            }
+            break;
+            case BOOT: case WRITE: this.fsm = FSM.WRITE; break;
         }
-        this.fsm = FSM.WRITE;
     }
 
     public Future<POS> append(final MemStore kvstore, final byte[] key, byte[] valueBytes, final long recordTimestamp) {
@@ -125,7 +128,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
     public <K> long bootstrap(String identifier, final MemStore kvstore, int partition, Optional<ObservableState<K>> observableState) {
         switch(fsm) {
             case TAIL: stopLogSync(); break;
-            case WRITE: flushWrites(); break;
+            case WRITE: flushWrites();  break;
             case INIT: case BOOT: break;
         }
         fsm = FSM.BOOT;
@@ -158,6 +161,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
             case WRITE: throw new IllegalStateException("Cannot transition from write to tail - bootstrap is required first");
             case BOOT: case TAIL: break;
         }
+        fsm = FSM.TAIL;
 
         boolean success = logsync.compareAndSet(null, new LogSync() {
             @Override
@@ -190,9 +194,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
                 }
             }
         });
-        if (success) {
-            fsm = FSM.TAIL;
-        } else {
+        if (!success) {
             throw new IllegalStateException("Another LogSync thread is already running");
         }
         logsync.get().start();
@@ -240,7 +242,7 @@ public class Log<POS extends Comparable<POS>> extends Thread implements Closeabl
         storage.flush();
     }
 
-    private void stopLogSync() {
+    private void stopLogSync()  {
         LogSync sync = logsync.get();
         if (sync == null) {
             throw new IllegalStateException("Tail mode requires a running logsync thread");
